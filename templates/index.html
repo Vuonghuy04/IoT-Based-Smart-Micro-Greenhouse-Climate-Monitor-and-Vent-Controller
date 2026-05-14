@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="10">
+    <title>{{ project_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div>
+            <p class="eyebrow">Edge Dashboard</p>
+            <h1>{{ project_name }}</h1>
+        </div>
+        <nav class="nav">
+            <a class="active" href="{{ url_for('index') }}">Dashboard</a>
+            <a href="{{ url_for('history') }}">History</a>
+        </nav>
+    </header>
+
+    <main class="page">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <section class="messages">
+                    {% for category, message in messages %}
+                        <div class="message {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </section>
+            {% endif %}
+        {% endwith %}
+
+        {% if database_error %}
+            <section class="alert">
+                <strong>Database:</strong> {{ database_error }}
+            </section>
+        {% endif %}
+
+        <section class="status-strip">
+            <div>
+                <span class="label">Serial</span>
+                <strong class="{{ 'ok' if serial_status.connected else 'bad' }}">
+                    {{ 'Connected' if serial_status.connected else 'Disconnected' }}
+                </strong>
+            </div>
+            <div>
+                <span class="label">Port</span>
+                <strong>{{ serial_status.port }}</strong>
+            </div>
+            <div>
+                <span class="label">Last line</span>
+                <strong>{{ serial_status.last_line or 'Waiting' }}</strong>
+            </div>
+        </section>
+
+        <section class="metric-grid" aria-label="Latest values">
+            <article class="metric-card">
+                <span>Temperature</span>
+                <strong>{{ latest.temperature|fmt(1) if latest else 'N/A' }} C</strong>
+            </article>
+            <article class="metric-card">
+                <span>Humidity</span>
+                <strong>{{ latest.humidity|fmt(1) if latest else 'N/A' }}%</strong>
+            </article>
+            <article class="metric-card">
+                <span>Steam</span>
+                <strong>{{ latest.steam_value if latest else 'N/A' }}</strong>
+            </article>
+            <article class="metric-card">
+                <span>Vent</span>
+                <strong>{{ latest.vent_state if latest else 'N/A' }}</strong>
+            </article>
+            <article class="metric-card">
+                <span>LED</span>
+                <strong>{{ latest.led_state if latest else 'N/A' }}</strong>
+            </article>
+        </section>
+
+        <section class="layout">
+            <div class="panel">
+                <div class="panel-heading">
+                    <h2>Thresholds</h2>
+                </div>
+                <form class="form-grid" action="{{ url_for('thresholds') }}" method="post">
+                    <label>
+                        Humidity
+                        <input
+                            type="number"
+                            name="humidity_threshold"
+                            value="{{ thresholds.humidity_threshold|fmt(1) }}"
+                            step="0.1"
+                            min="0"
+                            required
+                        >
+                    </label>
+                    <label>
+                        Steam
+                        <input
+                            type="number"
+                            name="steam_threshold"
+                            value="{{ thresholds.steam_threshold }}"
+                            step="1"
+                            min="0"
+                            required
+                        >
+                    </label>
+                    <button type="submit">Save Thresholds</button>
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="panel-heading">
+                    <h2>Manual Control</h2>
+                </div>
+                <form class="button-grid" action="{{ url_for('control') }}" method="post">
+                    <button name="command" value="OPEN" type="submit">Open Vent</button>
+                    <button name="command" value="CLOSE" type="submit">Close Vent</button>
+                    <button name="command" value="LED_ON" type="submit">LED On</button>
+                    <button name="command" value="LED_OFF" type="submit">LED Off</button>
+                </form>
+            </div>
+        </section>
+
+        <section class="layout">
+            <div class="panel">
+                <div class="panel-heading">
+                    <h2>Statistics</h2>
+                    <span>{{ stats.reading_count or 0 }} readings</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Min</th>
+                            <th>Max</th>
+                            <th>Mean</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Temperature</td>
+                            <td>{{ stats.temperature_min|fmt(1) }}</td>
+                            <td>{{ stats.temperature_max|fmt(1) }}</td>
+                            <td>{{ stats.temperature_mean|fmt(1) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Humidity</td>
+                            <td>{{ stats.humidity_min|fmt(1) }}</td>
+                            <td>{{ stats.humidity_max|fmt(1) }}</td>
+                            <td>{{ stats.humidity_mean|fmt(1) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Steam</td>
+                            <td>{{ stats.steam_min|fmt(0) }}</td>
+                            <td>{{ stats.steam_max|fmt(0) }}</td>
+                            <td>{{ stats.steam_mean|fmt(1) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="panel">
+                <div class="panel-heading">
+                    <h2>Command Log</h2>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Command</th>
+                            <th>Source</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for command in commands %}
+                            <tr>
+                                <td>{{ command.created_at }}</td>
+                                <td>{{ command.command }}</td>
+                                <td>{{ command.source }}</td>
+                                <td>{{ command.success|yesno }}</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="4">No commands yet.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
