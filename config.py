@@ -25,12 +25,17 @@ class Config:
     SERIAL_TIMEOUT = float(os.getenv("SERIAL_TIMEOUT", "1"))
     SERIAL_RECONNECT_SECONDS = float(os.getenv("SERIAL_RECONNECT_SECONDS", "5"))
     START_SERIAL_THREAD = _bool_from_env("START_SERIAL_THREAD", True)
+    AUTO_CONTROL_ENABLED = _bool_from_env("AUTO_CONTROL_ENABLED", True)
+    AUTO_VENT_MIN_OPEN_SECONDS = float(os.getenv("AUTO_VENT_MIN_OPEN_SECONDS", "20"))
+    AUTO_SERVO_COMMAND_COOLDOWN_SECONDS = float(
+        os.getenv("AUTO_SERVO_COMMAND_COOLDOWN_SECONDS", "8")
+    )
 
     # MariaDB connection
     DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
     DB_PORT = int(os.getenv("DB_PORT", "3306"))
     DB_USER = os.getenv("DB_USER", "root")
-    DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+    DB_PASSWORD = os.getenv("DB_PASSWORD", "admin")
     DB_NAME = os.getenv("DB_NAME", "greenhouse_iot")
 
     # Default rule values inserted into control_rule when the table is empty.

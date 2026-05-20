@@ -200,7 +200,8 @@ h2 {
     margin-bottom: 14px;
 }
 
-.form-grid {
+.form-grid,
+.mode-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
@@ -237,6 +238,23 @@ button {
 
 button:hover {
     background: var(--green-dark);
+}
+
+.mode-grid {
+    margin-bottom: 12px;
+}
+
+.mode-grid button {
+    background: var(--surface);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+.mode-grid button.active-mode,
+.mode-grid button:hover {
+    background: var(--green);
+    border-color: var(--green);
+    color: #ffffff;
 }
 
 .form-grid button {
@@ -305,6 +323,7 @@ td {
 
     .metric-grid,
     .form-grid,
+    .mode-grid,
     .button-grid {
         grid-template-columns: 1fr;
     }

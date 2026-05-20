@@ -111,12 +111,29 @@
             <div class="panel">
                 <div class="panel-heading">
                     <h2>Manual Control</h2>
+                    <span>{{ 'Auto' if serial_status.auto_control_enabled else 'Manual' }}</span>
                 </div>
+                <form class="mode-grid" action="{{ url_for('control_mode') }}" method="post">
+                    <button
+                        class="{{ 'active-mode' if serial_status.auto_control_enabled else '' }}"
+                        name="mode"
+                        value="auto"
+                        type="submit"
+                    >
+                        Auto
+                    </button>
+                    <button
+                        class="{{ 'active-mode' if not serial_status.auto_control_enabled else '' }}"
+                        name="mode"
+                        value="manual"
+                        type="submit"
+                    >
+                        Manual
+                    </button>
+                </form>
                 <form class="button-grid" action="{{ url_for('control') }}" method="post">
                     <button name="command" value="OPEN" type="submit">Open Vent</button>
                     <button name="command" value="CLOSE" type="submit">Close Vent</button>
-                    <button name="command" value="LED_ON" type="submit">LED On</button>
-                    <button name="command" value="LED_OFF" type="submit">LED Off</button>
                 </form>
             </div>
         </section>

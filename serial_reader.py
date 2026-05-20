@@ -6,7 +6,7 @@ import serial
 
 import database
 from config import Config
-from rule_engine import apply_rules
+from rule_engine import AutoController
 
 
 SENSOR_LINE_PATTERN = re.compile(
@@ -53,6 +53,10 @@ class SerialReader:
         self.last_error = None
         self.latest_reading = None
         self.last_line = None
+        self.current_vent_state = None
+        self.current_led_state = None
+        self.auto_control_enabled = Config.AUTO_CONTROL_ENABLED
+        self._auto_controller = AutoController()
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -74,7 +78,28 @@ class SerialReader:
             "connected": self.connected,
             "last_error": self.last_error,
             "last_line": self.last_line,
+            "vent_state": self.current_vent_state,
+            "led_state": self.current_led_state,
+            "auto_control_enabled": self.auto_control_enabled,
         }
+
+    def set_auto_control(self, enabled):
+        self.auto_control_enabled = bool(enabled)
+
+    def get_vent_state(self):
+        return self.current_vent_state
+
+    def set_known_state(self, vent_state=None, led_state=None):
+        if vent_state is not None:
+            self.current_vent_state = vent_state.strip().upper()
+        if led_state is not None:
+            self.current_led_state = led_state.strip().upper()
+
+        if self.latest_reading:
+            if vent_state is not None:
+                self.latest_reading["vent_state"] = self.current_vent_state
+            if led_state is not None:
+                self.latest_reading["led_state"] = self.current_led_state
 
     def send_command(self, command, source="manual"):
         """Send a command to Arduino and write the result to command_log."""
@@ -112,18 +137,24 @@ class SerialReader:
                     continue
 
                 self.last_line = line
+                if _is_non_sensor_status_line(line):
+                    continue
+
                 reading = parse_sensor_line(line)
                 self.latest_reading = reading
+                self.current_vent_state = reading["vent_state"]
+                self.current_led_state = reading["led_state"]
 
                 try:
                     database.insert_sensor_reading(reading)
                 except Exception as exc:
                     self.last_error = f"Database insert failed: {exc}"
 
-                try:
-                    apply_rules(reading, self)
-                except Exception as exc:
-                    self.last_error = f"Rule engine failed: {exc}"
+                if self.auto_control_enabled:
+                    try:
+                        self._auto_controller.apply(reading, self)
+                    except Exception as exc:
+                        self.last_error = f"Rule engine failed: {exc}"
             except ValueError as exc:
                 self.last_error = str(exc)
             except Exception as exc:
@@ -169,3 +200,7 @@ class SerialReader:
             database.log_command(command, source, success, message)
         except Exception as exc:
             self.last_error = f"Command log failed: {exc}"
+
+
+def _is_non_sensor_status_line(line):
+    return line == "SYSTEM_READY" or line.startswith("ACK:")

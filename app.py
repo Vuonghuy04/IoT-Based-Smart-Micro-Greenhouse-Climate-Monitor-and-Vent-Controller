@@ -4,7 +4,22 @@ from flask import Flask, flash, redirect, render_template, request, url_for
 
 import database
 from config import Config
-from serial_reader import ALLOWED_COMMANDS, SerialReader
+from serial_reader import SerialReader
+
+
+MANUAL_CONTROL_COMMANDS = {"OPEN", "CLOSE"}
+VENT_STATE_BY_COMMAND = {
+    "OPEN": "OPEN",
+    "CLOSE": "CLOSED",
+}
+LED_STATE_BY_COMMAND = {
+    "OPEN": "ON",
+    "CLOSE": "OFF",
+}
+VENT_ALREADY_MESSAGE_BY_COMMAND = {
+    "OPEN": "Vent is already opened.",
+    "CLOSE": "Vent is already closed.",
+}
 
 
 def create_app():
@@ -91,12 +106,39 @@ def register_routes(app):
         command = request.form.get("command", "").strip().upper()
         serial_reader = app.config["SERIAL_READER"]
 
-        if command not in ALLOWED_COMMANDS:
+        if command not in MANUAL_CONTROL_COMMANDS:
             flash(f"Invalid command: {command}", "error")
             return redirect(url_for("index"))
 
+        desired_vent_state = VENT_STATE_BY_COMMAND[command]
+        current_vent_state = _current_vent_state(serial_reader)
+        if current_vent_state == desired_vent_state:
+            flash(VENT_ALREADY_MESSAGE_BY_COMMAND[command], "error")
+            return redirect(url_for("index"))
+
+        serial_reader.set_auto_control(False)
         success, message = serial_reader.send_command(command, source="manual")
+        if success:
+            serial_reader.set_known_state(
+                vent_state=desired_vent_state,
+                led_state=LED_STATE_BY_COMMAND[command],
+            )
+            message = f"Sent {command}. Auto control is now off."
         flash(message, "success" if success else "error")
+        return redirect(url_for("index"))
+
+    @app.route("/control-mode", methods=["POST"])
+    def control_mode():
+        mode = request.form.get("mode", "").strip().lower()
+        serial_reader = app.config["SERIAL_READER"]
+
+        if mode not in {"auto", "manual"}:
+            flash(f"Invalid control mode: {mode}", "error")
+            return redirect(url_for("index"))
+
+        serial_reader.set_auto_control(mode == "auto")
+        message = "Auto control enabled." if mode == "auto" else "Manual control enabled."
+        flash(message, "success")
         return redirect(url_for("index"))
 
 
@@ -128,6 +170,21 @@ def _load_history_context(flask_app):
         context["database_error"] = str(exc)
 
     return context
+
+
+def _current_vent_state(serial_reader):
+    state = serial_reader.get_vent_state()
+    if state:
+        return state
+
+    try:
+        latest = database.get_latest_reading()
+    except Exception:
+        return None
+
+    if latest:
+        return str(latest["vent_state"]).upper()
+    return None
 
 
 def _empty_context(flask_app):
