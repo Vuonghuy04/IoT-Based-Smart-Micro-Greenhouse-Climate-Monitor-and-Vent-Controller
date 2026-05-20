@@ -8,7 +8,6 @@
     --green: #247a4b;
     --green-dark: #185736;
     --blue: #256a88;
-    --amber: #a55d13;
     --red: #a33535;
     --shadow: 0 12px 30px rgba(26, 45, 35, 0.08);
 }
@@ -267,8 +266,7 @@ button:hover {
     gap: 12px;
 }
 
-.button-grid button:nth-child(2),
-.button-grid button:nth-child(4) {
+.button-grid button:nth-child(2) {
     background: var(--blue);
     border-color: var(--blue);
 }

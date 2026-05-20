@@ -7,18 +7,19 @@ from config import Config
 from serial_reader import SerialReader
 
 
-MANUAL_CONTROL_COMMANDS = {"OPEN", "CLOSE"}
-VENT_STATE_BY_COMMAND = {
-    "OPEN": "OPEN",
-    "CLOSE": "CLOSED",
-}
-LED_STATE_BY_COMMAND = {
-    "OPEN": "ON",
-    "CLOSE": "OFF",
-}
-VENT_ALREADY_MESSAGE_BY_COMMAND = {
-    "OPEN": "Vent is already opened.",
-    "CLOSE": "Vent is already closed.",
+MANUAL_ACTIONS = {
+    "OPEN": {
+        "vent_state": "OPEN",
+        "led_command": "LED_ON",
+        "led_state": "ON",
+        "already_message": "Vent is already opened.",
+    },
+    "CLOSE": {
+        "vent_state": "CLOSED",
+        "led_command": "LED_OFF",
+        "led_state": "OFF",
+        "already_message": "Vent is already closed.",
+    },
 }
 
 
@@ -105,25 +106,34 @@ def register_routes(app):
     def control():
         command = request.form.get("command", "").strip().upper()
         serial_reader = app.config["SERIAL_READER"]
+        action = MANUAL_ACTIONS.get(command)
 
-        if command not in MANUAL_CONTROL_COMMANDS:
+        if not action:
             flash(f"Invalid command: {command}", "error")
             return redirect(url_for("index"))
 
-        desired_vent_state = VENT_STATE_BY_COMMAND[command]
+        desired_vent_state = action["vent_state"]
         current_vent_state = _current_vent_state(serial_reader)
         if current_vent_state == desired_vent_state:
-            flash(VENT_ALREADY_MESSAGE_BY_COMMAND[command], "error")
+            flash(action["already_message"], "error")
             return redirect(url_for("index"))
 
         serial_reader.set_auto_control(False)
         success, message = serial_reader.send_command(command, source="manual")
         if success:
-            serial_reader.set_known_state(
-                vent_state=desired_vent_state,
-                led_state=LED_STATE_BY_COMMAND[command],
+            serial_reader.set_known_state(vent_state=desired_vent_state)
+            led_command = action["led_command"]
+            led_success, led_message = serial_reader.send_command(
+                led_command,
+                source="manual_sync",
             )
-            message = f"Sent {command}. Auto control is now off."
+            success = led_success
+
+            if led_success:
+                serial_reader.set_known_state(led_state=action["led_state"])
+                message = f"Sent {command} and {led_command}. Auto control is now off."
+            else:
+                message = f"Sent {command}, but LED sync failed: {led_message}"
         flash(message, "success" if success else "error")
         return redirect(url_for("index"))
 

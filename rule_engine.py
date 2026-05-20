@@ -22,30 +22,6 @@ def load_thresholds():
         return _default_thresholds()
 
 
-def evaluate_reading(reading, thresholds=None):
-    """Return the commands required by the latest greenhouse reading."""
-    needs_venting = reading_needs_venting(reading, thresholds)
-
-    commands = []
-    vent_state = _normalise_state(reading.get("vent_state"))
-    led_state = _normalise_state(reading.get("led_state"))
-
-    if needs_venting and not _vent_is_open(vent_state):
-        commands.append("OPEN")
-    elif not needs_venting and not _vent_is_closed(vent_state):
-        commands.append("CLOSE")
-
-    if commands:
-        return commands, needs_venting
-
-    if _vent_is_open(vent_state) and led_state != "ON":
-        commands.append("LED_ON")
-    elif _vent_is_closed(vent_state) and led_state != "OFF":
-        commands.append("LED_OFF")
-
-    return commands, needs_venting
-
-
 def reading_needs_venting(reading, thresholds=None):
     thresholds = thresholds or load_thresholds()
 
@@ -166,15 +142,6 @@ class AutoController:
                     self._vent_open_until,
                     now + Config.AUTO_VENT_MIN_OPEN_SECONDS,
                 )
-
-
-_default_controller = AutoController()
-
-
-def apply_rules(reading, command_sender):
-    """Apply automatic control rules and send needed Arduino commands."""
-    return _default_controller.apply(reading, command_sender)
-
 
 def _normalise_state(value):
     return str(value or "").strip().upper()
